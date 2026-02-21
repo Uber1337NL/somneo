@@ -5,14 +5,12 @@ __pycache__
 */build/*
 */dist/*
 
-
 # misc
 .coverage
 .vscode
 coverage.xml
-
+.DS_Store
 
 # Home Assistant configuration
 config/*
 !config/configuration.yaml
-.DS_Store
