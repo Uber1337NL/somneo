@@ -19,10 +19,11 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add Somneo from config_entry."""
-
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
     unique_id = config_entry.unique_id
-    assert unique_id is not None
+    if unique_id is None:
+        _LOGGER.error("Config entry is missing unique_id; cannot set up Somneo buttons")
+        return
     name = config_entry.data[CONF_NAME]
     device_info = config_entry.data["dev_info"]
 

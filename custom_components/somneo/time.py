@@ -1,6 +1,7 @@
 """Time entities for Somneo."""
-import logging
+
 from datetime import time
+from typing import Any
 
 from homeassistant.components.time import TimeEntity
 from homeassistant.config_entries import ConfigEntry
@@ -11,7 +12,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .entity import SomneoEntity
 
-_LOGGER = logging.getLogger(__name__)
+
+class ConfigEntryUniqueIdRequiredError(ValueError):
+    """Raised when a config entry unique_id is missing."""
+
+    def __init__(self) -> None:
+        """Initialize exception."""
+        super().__init__("Config entry unique_id is required")
 
 
 async def async_setup_entry(
@@ -20,17 +27,18 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add Somneo from config_entry."""
-
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
     unique_id = config_entry.unique_id
-    assert unique_id is not None
+    if unique_id is None:
+        raise ConfigEntryUniqueIdRequiredError
     name = config_entry.data[CONF_NAME]
     device_info = config_entry.data["dev_info"]
 
-    alarms = []
-    # Add hour & min number_entity for each alarms.
-    for alarm in list(coordinator.data["alarms"]):
-        alarms.append(SomneoTime(coordinator, unique_id, name, device_info, alarm))
+    # Add hour & min number_entity for each alarm.
+    alarms = [
+        SomneoTime(coordinator, unique_id, name, device_info, alarm)
+        for alarm in coordinator.data["alarms"]
+    ]
 
     async_add_entities(alarms, update_before_add=True)
 
@@ -45,7 +53,14 @@ class SomneoTime(SomneoEntity, TimeEntity):
     _attr_native_value = None
     _attr_translation_key = "time"
 
-    def __init__(self, coordinator, unique_id, name, dev_info, alarm):
+    def __init__(
+        self,
+        coordinator: Any,
+        unique_id: str,
+        name: str,
+        dev_info: dict[str, Any],
+        alarm: Any,
+    ) -> None:
         """Initialize number entities."""
         super().__init__(
             coordinator, unique_id, name, dev_info, "alarm" + str(alarm) + "_time"

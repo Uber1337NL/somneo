@@ -1,5 +1,7 @@
 """Select entities for Somneo."""
+
 import logging
+from typing import Any
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
@@ -27,17 +29,18 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add Somneo from config_entry."""
-
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
     unique_id = config_entry.unique_id
-    assert unique_id is not None
+    if unique_id is None:
+        msg = "unique_id must not be None"
+        raise ValueError(msg)
     name = config_entry.data[CONF_NAME]
     device_info = config_entry.data["dev_info"]
 
-    alarms = []
-    # Add hour & min number_entity for each alarms
-    for alarm in list(coordinator.data["alarms"]):
-        alarms.append(SomneoDays(coordinator, unique_id, name, device_info, alarm))
+    alarms = [
+        SomneoDays(coordinator, unique_id, name, device_info, alarm)
+        for alarm in coordinator.data["alarms"]
+    ]
 
     sunset = [
         SomneoSunsetSound(coordinator, unique_id, name, device_info, "sunset_sound"),
@@ -54,13 +57,20 @@ class SomneoDays(SomneoEntity, SelectEntity):
     _attr_should_poll = True
     _attr_assumed_state = False
     _attr_available = True
-    _attr_options = [WORKDAYS, WEEKEND, TOMORROW, EVERYDAY, CUSTOM]
     _attr_current_option = WORKDAYS
     _attr_translation_key = "days"
 
-    def __init__(self, coordinator, unique_id, name, dev_info, alarm):
+    def __init__(
+        self,
+        coordinator: Any,
+        unique_id: str,
+        name: str,
+        dev_info: dict[str, Any],
+        alarm: int,
+    ) -> None:
         """Initialize select entity for alarm days."""
         super().__init__(coordinator, unique_id, name, dev_info, "alarm" + str(alarm))
+        self._attr_options = [WORKDAYS, WEEKEND, TOMORROW, EVERYDAY, CUSTOM]
         self._attr_translation_placeholders = {"number": str(alarm)}
         self._alarm = alarm
 
@@ -79,7 +89,7 @@ class SomneoDays(SomneoEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Adjust the option in the UI."""
-        await self.coordinator.async_set_alarm(self._alarm, days=option)
+        await self.coordinator.async_set_alarm(str(self._alarm), days=option)
 
 
 class SomneoSunsetSound(SomneoEntity, SelectEntity):
@@ -127,7 +137,9 @@ class SomneoSunsetCurve(SomneoEntity, SelectEntity):
     @property
     def options(self) -> list:
         """Return a set of selectable options."""
-        return [item.replace(" ", "_") for item in self.coordinator.somneo.dusk_light_themes]
+        return [
+            item.replace(" ", "_") for item in self.coordinator.somneo.dusk_light_themes
+        ]
 
     @callback
     def _handle_coordinator_update(self) -> None:

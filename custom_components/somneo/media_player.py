@@ -4,6 +4,8 @@ import logging
 from homeassistant.components.media_player import (
     MediaPlayerDeviceClass,
     MediaPlayerEntity,
+)
+from homeassistant.components.media_player.const import (
     MediaPlayerEntityFeature,
     MediaPlayerState,
 )
@@ -24,10 +26,11 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add Somneo light from config_entry."""
-
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
     unique_id = config_entry.unique_id
-    assert unique_id is not None
+    if unique_id is None:
+        msg = "unique_id must not be None"
+        raise ValueError(msg)
     name = config_entry.data[CONF_NAME]
     device_info = config_entry.data["dev_info"]
 
@@ -65,11 +68,11 @@ class SomneoMediaPlayer(SomneoEntity, MediaPlayerEntity):
 
     async def async_turn_on(self) -> None:
         """Instruct the light to turn on."""
-        await self.coordinator.async_player_toggle(True)
+        await self.coordinator.async_player_toggle(state=True)
 
     async def async_turn_off(self) -> None:
         """Instruct the light to turn off."""
-        await self.coordinator.async_player_toggle(False)
+        await self.coordinator.async_player_toggle(state=False)
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set volume level."""

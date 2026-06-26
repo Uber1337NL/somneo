@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.light import ATTR_BRIGHTNESS, ColorMode, LightEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .entity import SomneoEntity
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,10 +25,11 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add Somneo light from config_entry."""
-
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
     unique_id = config_entry.unique_id
-    assert unique_id is not None
+    if unique_id is None:
+        msg = "Config entry unique_id is required"
+        raise ValueError(msg)
     name = config_entry.data[CONF_NAME]
     device_info = config_entry.data["dev_info"]
 
@@ -43,8 +46,12 @@ class SomneoLight(SomneoEntity, LightEntity):
     """Representation of an Somneo Light."""
 
     _attr_should_poll = True
-    _attr_supported_color_modes: set[ColorMode | str] = {ColorMode.BRIGHTNESS}
     _attr_translation_key = "normal_light"
+
+    @property
+    def supported_color_modes(self) -> set[ColorMode] | set[str] | None:
+        """Flag supported color modes."""
+        return {ColorMode.BRIGHTNESS}
 
     @property
     def color_mode(self) -> ColorMode:
@@ -67,20 +74,24 @@ class SomneoLight(SomneoEntity, LightEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Instruct the light to turn on."""
         await self.coordinator.async_toggle_light(
-            True, brightness=kwargs.get(ATTR_BRIGHTNESS)
+            state=True, brightness=kwargs.get(ATTR_BRIGHTNESS)
         )
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **_kwargs: Any) -> None:
         """Instruct the light to turn off."""
-        await self.coordinator.async_toggle_light(False)
+        await self.coordinator.async_toggle_light(state=False)
 
 
 class SomneoNightLight(SomneoEntity, LightEntity):
     """Representation of an Somneo Night light."""
 
     _attr_should_poll = True
-    _attr_supported_color_modes: set[ColorMode | str] = {ColorMode.ONOFF}
     _attr_translation_key = "night_light"
+
+    @property
+    def supported_color_modes(self) -> set[ColorMode] | set[str] | None:
+        """Flag supported color modes."""
+        return {ColorMode.ONOFF}
 
     @property
     def color_mode(self) -> ColorMode:
@@ -92,10 +103,10 @@ class SomneoNightLight(SomneoEntity, LightEntity):
         self._attr_is_on = self.coordinator.data["nightlight_is_on"]
         self.async_write_ha_state()
 
-    async def async_turn_on(self, **kwargs):
+    async def async_turn_on(self, **_kwargs: Any) -> None:
         """Instruct the light to turn on."""
-        await self.coordinator.async_toggle_nightlight(True)
+        await self.coordinator.async_toggle_nightlight(state=True)
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **_kwargs: Any) -> None:
         """Instruct the light to turn off."""
-        await self.coordinator.async_toggle_nightlight(False)
+        await self.coordinator.async_toggle_nightlight(state=False)

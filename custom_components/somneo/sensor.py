@@ -1,5 +1,6 @@
 """Sensor entities for Somneo."""
-import logging
+
+from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -14,7 +15,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN, SENSORS
 from .entity import SomneoEntity
 
-_LOGGER = logging.getLogger(__name__)
+
+class SomneoUniqueIdError(ValueError):
+    """Raised when a config entry unique_id is missing."""
+
+    def __init__(self) -> None:
+        """Initialize the exception."""
+        super().__init__("Config entry unique_id cannot be None")
 
 
 async def async_setup_entry(
@@ -23,16 +30,17 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add Somneo from config_entry."""
-
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
     unique_id = config_entry.unique_id
-    assert unique_id is not None
+    if unique_id is None:
+        raise SomneoUniqueIdError
     name = config_entry.data[CONF_NAME]
     device_info = config_entry.data["dev_info"]
 
-    sensors = []
-    for sensor in list(SENSORS):
-        sensors.append(SomneoSensor(coordinator, unique_id, name, device_info, sensor))
+    sensors: list[SensorEntity] = [
+        SomneoSensor(coordinator, unique_id, name, device_info, sensor)
+        for sensor in list(SENSORS)
+    ]
     sensors.append(
         SomneoNextAlarmSensor(coordinator, unique_id, name, device_info, "next")
     )
@@ -48,7 +56,14 @@ class SomneoSensor(SomneoEntity, SensorEntity):
 
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, coordinator, unique_id, name, dev_info, sensor_type):
+    def __init__(
+        self,
+        coordinator: Any,
+        unique_id: str,
+        name: str,
+        dev_info: dict[str, Any],
+        sensor_type: str,
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, unique_id, name, dev_info, sensor_type)
 
@@ -69,7 +84,7 @@ class SomneoSensor(SomneoEntity, SensorEntity):
         self.async_write_ha_state()
 
     @property
-    def device_class(self) -> SensorDeviceClass:
+    def device_class(self) -> SensorDeviceClass | None:
         """Return the class of this device, from component DEVICE_CLASSES."""
         if self._type == "temperature":
             return SensorDeviceClass.TEMPERATURE
@@ -79,8 +94,7 @@ class SomneoSensor(SomneoEntity, SensorEntity):
             return SensorDeviceClass.ILLUMINANCE
         if self._type == "noise":
             return SensorDeviceClass.SOUND_PRESSURE
-        else:
-            return None
+        return None
 
 
 class SomneoNextAlarmSensor(SomneoEntity, SensorEntity):

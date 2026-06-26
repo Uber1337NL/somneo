@@ -1,5 +1,6 @@
 """Text entities for Somneo."""
-import logging
+
+from typing import Any
 
 from homeassistant.components.text import TextEntity
 from homeassistant.config_entries import ConfigEntry
@@ -10,7 +11,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN
 from .entity import SomneoEntity
 
-_LOGGER = logging.getLogger(__name__)
+
+class ConfigEntryUniqueIdRequiredError(ValueError):
+    """Raised when the config entry unique_id is missing."""
+
+    def __init__(self) -> None:
+        """Initialize exception."""
+        super().__init__("Config entry unique_id is required")
 
 
 async def async_setup_entry(
@@ -19,16 +26,17 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add Somneo from config_entry."""
-
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
     unique_id = config_entry.unique_id
-    assert unique_id is not None
+    if unique_id is None:
+        raise ConfigEntryUniqueIdRequiredError
     name = config_entry.data[CONF_NAME]
     device_info = config_entry.data["dev_info"]
 
-    alarms = []
-    for alarm in list(coordinator.data["alarms"]):
-        alarms.append(SomneoAlarmDays(coordinator, unique_id, name, device_info, alarm))
+    alarms = [
+        SomneoAlarmDays(coordinator, unique_id, name, device_info, alarm)
+        for alarm in list(coordinator.data["alarms"])
+    ]
 
     async_add_entities(alarms, update_before_add=True)
 
@@ -43,7 +51,14 @@ class SomneoAlarmDays(SomneoEntity, TextEntity):
     _attr_pattern = "^((tomorrow|mon|tue|wed|thu|fri|sat|sun)(,)?)+$"
     _attr_translation_key = "days_str"
 
-    def __init__(self, coordinator, unique_id, name, device_info, alarm):
+    def __init__(
+        self,
+        coordinator: Any,
+        unique_id: str,
+        name: str,
+        device_info: dict[str, Any],
+        alarm: int,
+    ) -> None:
         """Initialize the switches."""
         super().__init__(
             coordinator, unique_id, name, device_info, "alarm" + str(alarm)
@@ -61,4 +76,4 @@ class SomneoAlarmDays(SomneoEntity, TextEntity):
 
     async def async_set_value(self, value: str) -> None:
         """Set the text value."""
-        await self.coordinator.async_set_alarm(self._alarm, days=value.split(","))
+        await self.coordinator.async_set_alarm(str(self._alarm), days=value.split(","))
